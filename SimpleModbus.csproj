@@ -45,5 +45,11 @@
     <Compile Include="SimpleModbusCore.cs" />
     <Compile Include="SimpleModbusTCP.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SocketManager\SocketManager.csproj">
+      <Project>{4bfb50f6-69eb-4e78-a557-a314c0de371f}</Project>
+      <Name>SocketManager</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
