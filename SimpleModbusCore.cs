@@ -80,7 +80,7 @@ namespace SimpleModbus
                 Data.Add(HighByte(protocolIdentifier));
                 Data.Add(LowByte(protocolIdentifier));
 
-                Data.Add(HighByte(pdu.Data.Count+1));
+                Data.Add(HighByte(pdu.Data.Count + 1));
                 Data.Add(LowByte(pdu.Data.Count + 1));
 
                 Data.Add(unitIdentifier);
@@ -89,7 +89,7 @@ namespace SimpleModbus
             {
                 PDU = pdu;
 
-                if(data.Length < 10)
+                if (data.Length < 10)
                 {
                     Data.AddRange(new byte[7]);
 
@@ -102,7 +102,7 @@ namespace SimpleModbus
                 Data.AddRange(data_list.GetRange(0, 7));
                 PDU.Data.AddRange(data_list.GetRange(7, this.Length - 1));
 
-                if(PDU.Data.Count < this.Length - 1)
+                if (PDU.Data.Count < this.Length - 1)
                 {
 
                 }
@@ -116,7 +116,7 @@ namespace SimpleModbus
             private byte HighByte(int i) => (byte)((i & 0b_1111_1111_0000_0000) >> 8);
         }
 
-        public class PDU
+        public abstract class PDU
         {
             public enum PDUType
             {
@@ -127,67 +127,132 @@ namespace SimpleModbus
             //Public
             public PDUType Type { get; private set; }
             public PublicFunctionCodes FunctionCode => (PublicFunctionCodes)Data[0];
-            public bool IsExceptionFunctionCode => (Data[0] >> 7) == 1;
 
             public List<byte> Data { get; private set; } = new List<byte>();
             public string HEXString => BitConverter.ToString(Data.ToArray()).Replace("-", " ");
 
             //Protected
-            protected void Create(PDUType type, PublicFunctionCodes functionCode, int startAddress, int quantity, int[] values)
+            protected void Create(PDUType type, PublicFunctionCodes functionCode, int startAddress, object value)
             {
-                Type = type;
-
-                Data.Add((byte)functionCode);
-
-                Data.Add(HighByte(startAddress));
-                Data.Add(LowByte(startAddress));
-
-                Data.Add(HighByte(quantity));
-                Data.Add(LowByte(quantity));
-
-                Data.Add((byte)(values.Length * 2));
-
-                if (values == null) return;
-
-                for (int i = 0; i < values.Length; i++)
+                if (value.GetType() == typeof(short[]))
                 {
-                    Data.Add(HighByte(values[i]));
-                    Data.Add(LowByte(values[i]));
+                    short[] val = (short[])value;
+
+                    Type = type;
+
+                    Data.Add((byte)functionCode);
+
+                    Data.Add(HighByte(startAddress));
+                    Data.Add(LowByte(startAddress));
+
+                    Data.Add(HighByte(val.Length));
+                    Data.Add(LowByte(val.Length));
+
+                    Data.Add((byte)(val.Length * 2));
+
+                    for (int i = 0; i < val.Length; i++)
+                    {
+                        Data.Add(HighByte(val[i]));
+                        Data.Add(LowByte(val[i]));
+                    }
                 }
-            }
-            protected void Create(PDUType type, PublicFunctionCodes functionCode, int startAddress, bool value)
-            {
-                Type = type;
+                else if (value.GetType() == typeof(int[]))
+                {
+                    int[] val = (int[])value;
 
-                Data.Add((byte)functionCode);
+                    Type = type;
 
-                Data.Add(HighByte(startAddress));
-                Data.Add(LowByte(startAddress));
+                    Data.Add((byte)functionCode);
 
-                if (value)
-                    Data.Add(0xFF);
-                else
-                    Data.Add(0xFF);
-                Data.Add(0);
-            }
-            protected void Create(PDUType type, PublicFunctionCodes functionCode, int startAddress, int value)
-            {
-                Type = type;
+                    Data.Add(HighByte(startAddress));
+                    Data.Add(LowByte(startAddress));
 
-                Data.Add((byte)functionCode);
+                    Data.Add(HighByte(val.Length * 2));
+                    Data.Add(LowByte(val.Length * 2));
 
-                Data.Add(HighByte(startAddress));
-                Data.Add(LowByte(startAddress));
+                    Data.Add((byte)(val.Length * 4));
 
-                Data.Add(HighByte(value));
-                Data.Add(LowByte(value));
+                    for (int i = 0; i < val.Length; i++)
+                    {
+                        Data.Add(HighByteHighWord(val[i]));
+                        Data.Add(LowByteHighWord(val[i]));
+                        Data.Add(HighByte(val[i]));
+                        Data.Add(LowByte(val[i]));
+                    }
+                }
+                else if (value.GetType() == typeof(float[]))
+                {
+                    float[] val = (float[])value;
+
+                    Type = type;
+
+                    Data.Add((byte)functionCode);
+
+                    Data.Add(HighByte(startAddress));
+                    Data.Add(LowByte(startAddress));
+
+                    Data.Add(HighByte(val.Length * 2));
+                    Data.Add(LowByte(val.Length * 2));
+
+                    Data.Add((byte)(val.Length * 4));
+
+                    for (int i = 0; i < val.Length; i++)
+                    {
+                        byte[] b = BitConverter.GetBytes(val[i]);
+                        b = Reverse(b);
+                        Data.AddRange(b);
+                    }
+                }
+                else if (value.GetType() == typeof(int))
+                {
+                    Type = type;
+
+                    Data.Add((byte)functionCode);
+
+                    Data.Add(HighByte(startAddress));
+                    Data.Add(LowByte(startAddress));
+
+                    Data.Add(HighByte((int)value));
+                    Data.Add(LowByte((int)value));
+                }
+                else if (value.GetType() == typeof(bool))
+                {
+                    Type = type;
+
+                    Data.Add((byte)functionCode);
+
+                    Data.Add(HighByte(startAddress));
+                    Data.Add(LowByte(startAddress));
+
+                    if ((bool)value)
+                        Data.Add(0xFF);
+                    else
+                        Data.Add(0xFF);
+                    Data.Add(0);
+                }
             }
             protected void Create(PDUType type) => Type = type;
 
             //Private
-            private byte LowByte(int i) => (byte)(i & 0b_0000_0000_1111_1111);
+            private byte LowByte(int i) => (byte)(i & 0b_1111_1111);
             private byte HighByte(int i) => (byte)((i & 0b_1111_1111_0000_0000) >> 8);
-            
+            private byte LowByteHighWord(int i) => (byte)((i & 0b_1111_1111_0000_0000__0000_0000) >> 16);
+            private byte HighByteHighWord(int i) => (byte)((i & 0b_1111_1111_0000_0000_0000_0000__0000_0000) >> 24);
+            private byte[] Reverse(byte[] arr)
+            {
+                int i = 0;
+                int j = arr.Length - 1;
+                while (i < j)
+                {
+                    var temp = arr[i];
+                    arr[i] = arr[j];
+                    arr[j] = temp;
+                    i++;
+                    j--;
+                }
+                return arr;
+            }
+
             //private int SwapBytes(int i) => (i >> 8) | (i << 8);
             //private byte LowNibble(byte b) => (byte)(b & 0b_0000_1111);
             //private byte HighNibble(byte b) => (byte)((b & 0b_1111_0000) >> 4);
@@ -196,15 +261,17 @@ namespace SimpleModbus
 
         public class ADU_FunctionRequest : PDU
         {
+            //Public Read Only
             public int Address => (Data[1] << 8) | Data[2];
             public int Quantity => (Data[3] << 8) | Data[4];
-            public ADU_FunctionRequest(PublicFunctionCodes functionCode, int address, int quantity, int[] values) => Create(PDU.PDUType.Request, functionCode, address, quantity, values);
-            public ADU_FunctionRequest(PublicFunctionCodes functionCode, int address, int value) => Create(PDU.PDUType.Request, functionCode, address, value);
-            public ADU_FunctionRequest(PublicFunctionCodes functionCode, int address, bool value) => Create(PDU.PDUType.Request, functionCode, address, value);
+
+            //Public
+            public ADU_FunctionRequest(PublicFunctionCodes functionCode, int address, object value) => Create(PDU.PDUType.Request, functionCode, address, value);
         }
 
         public class ADU_FunctionResponse : PDU
         {
+            public bool IsExceptionFunctionCode => (Data[0] >> 7) == 1;
             public int Address => (Data[1] << 8) | Data[2];
             public int Value => (Data[3] << 8) | Data[4];
 
@@ -220,7 +287,7 @@ namespace SimpleModbus
 
             public bool Bool => Convert.ToBoolean(Data[2]);
             public int Int16 => (Data[2] << 8) | Data[3];
-            public int Int32 => ((Data[2] << 8) | Data[3]) << 16 | ((Data[4] << 8) | Data[5]);
+            public int Int32 => System.BitConverter.ToInt32(Reverse(Data.GetRange(2, 4).ToArray()), 0); //((Data[2] << 8) | Data[3]) << 16 | ((Data[4] << 8) | Data[5]);
             public float Float => System.BitConverter.ToSingle(Reverse(Data.GetRange(2, 4).ToArray()), 0);
 
             private byte[] Reverse(byte[] arr)
