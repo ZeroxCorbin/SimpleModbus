@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SocketManagerNS;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,15 +16,16 @@ namespace SimpleModbus
         public delegate void MessageEventHandler(string message);
         public event MessageEventHandler Message;
 
-        public SocketManagerNS.SocketManager Socket { get; private set; }
+        public SocketManager Socket { get; private set; }
+        
         public bool IsConnected => Socket.IsConnected;
 
         public bool Connect(string ip, int port = 502)
         {
-            Socket = new SocketManagerNS.SocketManager($"{ip}:{port}");
+            Socket = new SocketManager($"{ip}:{port}");
             try
             {
-                Socket.Connect(true);
+                Socket.Connect();
             }
             catch (Exception ex)
             {
@@ -36,14 +38,15 @@ namespace SimpleModbus
             else
                 return false;
         }
-        public void Disconnect() => Socket?.Disconnect();
+        public void Close() => Socket?.Close();
 
         private SimpleModbusCore.MBAP PreWrite(SimpleModbusCore.PublicFunctionCodes functionCode, int addr, object value) => Write(new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionRequest(functionCode, addr, value)));
         private SimpleModbusCore.MBAP Write(SimpleModbusCore.MBAP mbap)
         {
             Message?.Invoke($"W: {mbap.MessageHEXString}");
-
-            byte[] b = Socket.WriteRead(mbap.Message);
+            Socket.Write(mbap.Message);
+            Thread.Sleep(20);
+            byte[] b = Socket.ReadBytes('\0');
 
             mbap = new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionResponse(), b);
             Message?.Invoke($"R: {mbap.MessageHEXString}");
@@ -198,7 +201,7 @@ namespace SimpleModbus
         {
             if (!disposedValue)
             {
-                Socket?.Disconnect();
+                Socket?.Close();
 
                 if (disposing)
                 {
