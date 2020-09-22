@@ -17,36 +17,14 @@ namespace SimpleModbus
         public event MessageEventHandler Message;
 
         public SocketManager Socket { get; private set; }
-        
-        public bool IsConnected => Socket.IsConnected;
-
-        public bool Connect(string ip, int port = 502)
-        {
-            Socket = new SocketManager($"{ip}:{port}");
-            try
-            {
-                Socket.Connect();
-            }
-            catch (Exception ex)
-            {
-                Error?.Invoke(this, ex);
-                return false;
-            }
-
-            if (Socket.IsConnected)
-                return true;
-            else
-                return false;
-        }
-        public void Close() => Socket?.Close();
+        public SimpleModbusTCP(SocketManager socket) => Socket = socket;
 
         private SimpleModbusCore.MBAP PreWrite(SimpleModbusCore.PublicFunctionCodes functionCode, int addr, object value) => Write(new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionRequest(functionCode, addr, value)));
         private SimpleModbusCore.MBAP Write(SimpleModbusCore.MBAP mbap)
         {
             Message?.Invoke($"W: {mbap.MessageHEXString}");
             Socket.Write(mbap.Message);
-            Thread.Sleep(20);
-            byte[] b = Socket.ReadBytes('\0');
+            byte[] b = Socket.ReadBytes();
 
             mbap = new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionResponse(), b);
             Message?.Invoke($"R: {mbap.MessageHEXString}");
@@ -142,7 +120,7 @@ namespace SimpleModbus
         }
         public string GetString(int addr)
         {
-            return null;
+            return "";
         }
 
         public bool SetBool(int addr, bool value)
