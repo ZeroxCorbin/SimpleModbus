@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace SimpleModbus
 {
-    public class SimpleModbusTCP : IDisposable
+    public class SimpleModbusTCP
     {
         public delegate void ErrorEventHandler(object sender, Exception data);
         public event ErrorEventHandler Error;
@@ -19,24 +19,84 @@ namespace SimpleModbus
         public SocketManager Socket { get; private set; }
         public SimpleModbusTCP(SocketManager socket) => Socket = socket;
 
+        private object SocketLock { get; } = new object();
+
         private SimpleModbusCore.MBAP PreWrite(SimpleModbusCore.PublicFunctionCodes functionCode, int addr, object value) => Write(new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionRequest(functionCode, addr, value)));
         private SimpleModbusCore.MBAP Write(SimpleModbusCore.MBAP mbap)
-        {
+        { 
             Message?.Invoke($"W: {mbap.MessageHEXString}");
-            Socket.Write(mbap.Message);
-            byte[] b = Socket.ReadBytes();
 
-            mbap = new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionResponse(), b);
+            lock (SocketLock)
+            {
+                Socket.Write(mbap.Message);
+                byte[] b = Socket.ReadBytes();
+                mbap = new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionResponse(), b);
+            } 
+            
             Message?.Invoke($"R: {mbap.MessageHEXString}");
-
             return mbap;
         }
 
-        public bool GetBool(int addr)
+        //public T Get<T>(SimpleModbusCore.PublicFunctionCodes code, int address, int quantity)
+        //{
+        //    if (typeof(T) == typeof(short))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Int16, typeof(T));
+        //    if (typeof(T) == typeof(int))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Int32, typeof(T));
+        //    if (typeof(T) == typeof(bool))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Bool, typeof(T));
+        //    if (typeof(T) == typeof(float))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Float, typeof(T));
+
+        //    return default;
+        //}
+
+        //public bool Set<T>(int address, T value)
+        //{
+        //    if (typeof(T) == typeof(short))
+        //        return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteSingleRegister, address, value).PDU).IsExceptionFunctionCode;
+        //    //if (typeof(T) == typeof(Int32))
+        //    //    return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, address, quantity).PDU).Int32, typeof(T));
+        //    if (typeof(T) == typeof(bool))
+        //        return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteSingleCoil, address, value).PDU).IsExceptionFunctionCode;
+        //    //if (typeof(T) == typeof(float))
+        //    //    return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Float, typeof(T));
+
+        //    return default;
+        //}
+
+
+        //public T Set<T>(SimpleModbusCore.PublicFunctionCodes code, int address, int quantity)
+        //{
+        //    if (typeof(T) == typeof(Int16))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Int16, typeof(T));
+        //    if (typeof(T) == typeof(Int32))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Int32, typeof(T));
+        //    if (typeof(T) == typeof(bool))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Bool, typeof(T));
+        //    if (typeof(T) == typeof(float))
+        //        return (T)Convert.ChangeType(((SimpleModbusCore.ADU_FunctionResponse)PreWrite(code, address, quantity).PDU).Float, typeof(T));
+
+        //    return default;
+        //}
+        public bool ReadDiscreteInput(int addr)
         {
             try
             {
                 return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.ReadDiscreteInput, addr, 1).PDU).Bool;
+            }
+
+            catch (Exception ex)
+            {
+                Error?.Invoke(this, ex);
+                return false;
+            }
+        }
+        public bool ReadCoils(int addr)
+        {
+            try
+            {
+                return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.ReadCoils, addr, 1).PDU).Bool;
             }
 
             catch (Exception ex)
@@ -123,11 +183,11 @@ namespace SimpleModbus
             return "";
         }
 
-        public bool SetBool(int addr, bool value)
+        public bool WriteSingleCoil(int addr, bool value)
         {
             try
             {
-                return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteSingleCoil, addr, value).PDU).IsExceptionFunctionCode;
+                return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteSingleCoil, addr, value).PDU).IsExceptionFunctionCode;
             }
             catch (Exception ex)
             {
@@ -139,7 +199,7 @@ namespace SimpleModbus
         {
             try
             {
-                return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
+                return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
             }
             catch (Exception ex)
             {
@@ -151,7 +211,7 @@ namespace SimpleModbus
         {
             try
             {
-                return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
+                return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
             }
             catch (Exception ex)
             {
@@ -163,7 +223,7 @@ namespace SimpleModbus
         {
             try
             {
-                return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
+                return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
             }
             catch (Exception ex)
             {
@@ -171,40 +231,5 @@ namespace SimpleModbus
                 return false;
             }
         }
-
-        #region IDisposable Support
-        private bool disposedValue = false; // To detect redundant calls
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                Socket?.Close();
-
-                if (disposing)
-                {
-                    Socket?.Dispose();
-                }
-
-                disposedValue = true;
-            }
-        }
-
-        // TODO: override a finalizer only if Dispose(bool disposing) above has code to free unmanaged resources.
-        ~SimpleModbusTCP()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(false);
-        }
-
-        // This code added to correctly implement the disposable pattern.
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in Dispose(bool disposing) above.
-            Dispose(true);
-            // TODO: uncomment the following line if the finalizer is overridden above.
-            // GC.SuppressFinalize(this);
-        }
-        #endregion
     }
 }

@@ -134,11 +134,11 @@ namespace SimpleModbus
             //Protected
             protected void Create(PDUType type, PublicFunctionCodes functionCode, int startAddress, object value)
             {
+                Type = type;
+
                 if (value.GetType() == typeof(short[]))
                 {
                     short[] val = (short[])value;
-
-                    Type = type;
 
                     Data.Add((byte)functionCode);
 
@@ -159,8 +159,6 @@ namespace SimpleModbus
                 else if (value.GetType() == typeof(int[]))
                 {
                     int[] val = (int[])value;
-
-                    Type = type;
 
                     Data.Add((byte)functionCode);
 
@@ -184,8 +182,6 @@ namespace SimpleModbus
                 {
                     float[] val = (float[])value;
 
-                    Type = type;
-
                     Data.Add((byte)functionCode);
 
                     Data.Add(HighByte(startAddress));
@@ -205,8 +201,6 @@ namespace SimpleModbus
                 }
                 else if (value.GetType() == typeof(int))
                 {
-                    Type = type;
-
                     Data.Add((byte)functionCode);
 
                     Data.Add(HighByte(startAddress));
@@ -217,8 +211,6 @@ namespace SimpleModbus
                 }
                 else if (value.GetType() == typeof(bool))
                 {
-                    Type = type;
-
                     Data.Add((byte)functionCode);
 
                     Data.Add(HighByte(startAddress));
@@ -227,7 +219,7 @@ namespace SimpleModbus
                     if ((bool)value)
                         Data.Add(0xFF);
                     else
-                        Data.Add(0xFF);
+                        Data.Add(0x00);
                     Data.Add(0);
                 }
             }
@@ -271,22 +263,18 @@ namespace SimpleModbus
 
         public class ADU_FunctionResponse : PDU
         {
-            public bool IsExceptionFunctionCode => (Data[0] >> 7) == 1;
+
             public int Address => (Data[1] << 8) | Data[2];
             public int Value => (Data[3] << 8) | Data[4];
 
-            public int ExceptionCode
-            {
-                get
-                {
-                    return Data[1] + 0x80;
-                }
-            }
+            public bool IsExceptionFunctionCode => (Data[0] >> 8) == 1;
+            public int ExceptionCode => Data[1];
+
             public byte ByteCount => Data[1];
             public int Status => (Data[3] << 8) | Data[4];
 
             public bool Bool => Convert.ToBoolean(Data[2]);
-            public int Int16 => (Data[2] << 8) | Data[3];
+            public short Int16 => (short)((Data[2] << 8) | Data[3]);
             public int Int32 => System.BitConverter.ToInt32(Reverse(Data.GetRange(2, 4).ToArray()), 0); //((Data[2] << 8) | Data[3]) << 16 | ((Data[4] << 8) | Data[5]);
             public float Float => System.BitConverter.ToSingle(Reverse(Data.GetRange(2, 4).ToArray()), 0);
 
