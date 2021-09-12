@@ -178,9 +178,17 @@ namespace SimpleModbus
                 return 0.0f;
             }
         }
-        public string GetString(int addr)
+        public string GetString(int addr, int quantityOfChars)
         {
-            return "";
+            try
+            {
+                return ((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.ReadInputRegister, addr, quantityOfChars).PDU).String;
+            }
+            catch (Exception ex)
+            {
+                Error?.Invoke(this, ex);
+                return "";
+            }
         }
 
         public bool WriteSingleCoil(int addr, bool value)
@@ -188,6 +196,18 @@ namespace SimpleModbus
             try
             {
                 return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteSingleCoil, addr, value).PDU).IsExceptionFunctionCode;
+            }
+            catch (Exception ex)
+            {
+                Error?.Invoke(this, ex);
+                return false;
+            }
+        }
+        public bool SetByte(int addr, byte[] values)
+        {
+            try
+            {
+                return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
             }
             catch (Exception ex)
             {
@@ -224,6 +244,20 @@ namespace SimpleModbus
             try
             {
                 return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, values).PDU).IsExceptionFunctionCode;
+            }
+            catch (Exception ex)
+            {
+                Error?.Invoke(this, ex);
+                return false;
+            }
+        }
+        public bool SetString(int addr, string value)
+        {
+            try
+            {
+                byte[] bytes = Encoding.UTF8.GetBytes(value);
+
+                return !((SimpleModbusCore.ADU_FunctionResponse)PreWrite(SimpleModbusCore.PublicFunctionCodes.WriteMultipleRegisters, addr, bytes).PDU).IsExceptionFunctionCode;
             }
             catch (Exception ex)
             {

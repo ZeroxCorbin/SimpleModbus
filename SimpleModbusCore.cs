@@ -136,7 +136,26 @@ namespace SimpleModbus
             {
                 Type = type;
 
-                if (value.GetType() == typeof(short[]))
+                if (value.GetType() == typeof(byte[]))
+                {
+                    byte[] val = (byte[])value;
+
+                    Data.Add((byte)functionCode);
+
+                    Data.Add(HighByte(startAddress));
+                    Data.Add(LowByte(startAddress));
+
+                    Data.Add(HighByte(val.Length));
+                    Data.Add(LowByte(val.Length));
+
+                    Data.Add((byte)val.Length);
+
+                    for (int i = 0; i < val.Length; i++)
+                    {
+                        Data.Add(val[i]);
+                    }
+                }
+                else if (value.GetType() == typeof(short[]))
                 {
                     short[] val = (short[])value;
 
@@ -275,8 +294,25 @@ namespace SimpleModbus
 
             public bool Bool => Convert.ToBoolean(Data[2]);
             public short Int16 => (short)((Data[2] << 8) | Data[3]);
-            public int Int32 => System.BitConverter.ToInt32(Reverse(Data.GetRange(2, 4).ToArray()), 0); //((Data[2] << 8) | Data[3]) << 16 | ((Data[4] << 8) | Data[5]);
-            public float Float => System.BitConverter.ToSingle(Reverse(Data.GetRange(2, 4).ToArray()), 0);
+            public int Int32 => System.BitConverter.ToInt32(Reverse(Data.GetRange(2, ByteCount).ToArray()), 0); //((Data[2] << 8) | Data[3]) << 16 | ((Data[4] << 8) | Data[5]);
+            public float Float => System.BitConverter.ToSingle(Reverse(Data.GetRange(2, ByteCount).ToArray()), 0);
+            public string String
+            {
+                get
+                {
+                    List<byte> bytes = new List<byte>();
+                    foreach (byte b in Data.GetRange(2, ByteCount).ToArray())
+                    {
+                        if (b > 0)
+                            bytes.Add(b);
+                        else
+                            break;
+                    }
+ 
+
+                    return Encoding.UTF8.GetString(bytes.ToArray(), 0, bytes.Count);
+                }
+            }
 
             private byte[] Reverse(byte[] arr)
             {
