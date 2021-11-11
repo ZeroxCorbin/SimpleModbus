@@ -1,5 +1,4 @@
-﻿using SocketManagerNS;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,8 +15,8 @@ namespace SimpleModbus
         public delegate void MessageEventHandler(string message);
         public event MessageEventHandler Message;
 
-        public SocketManager Socket { get; private set; }
-        public SimpleModbusTCP(SocketManager socket) => Socket = socket;
+        public AsyncSocket.ASocket Socket { get; private set; }
+        public SimpleModbusTCP(AsyncSocket.ASocket socket) => Socket = socket;
 
         private object SocketLock { get; } = new object();
 
@@ -28,8 +27,12 @@ namespace SimpleModbus
 
             lock (SocketLock)
             {
-                Socket.Write(mbap.Message);
-                byte[] b = Socket.ReadBytes();
+                Socket.Send(mbap.Message);
+                byte[] b = Socket.Receive(true);
+
+                if (b == null)
+                    return null;
+
                 mbap = new SimpleModbusCore.MBAP(new SimpleModbusCore.ADU_FunctionResponse(), b);
             } 
             
