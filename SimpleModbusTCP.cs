@@ -28,7 +28,7 @@ namespace SimpleModbus
             lock (SocketLock)
             {
                 Socket.Send(mbap.Message);
-                byte[] b = Socket.Receive(true);
+                byte[] b = Socket.ReceiveBytes(1000);
 
                 if (b == null)
                     return null;
